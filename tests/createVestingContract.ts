@@ -34,7 +34,20 @@ describe('psy-vesting createVestingContract', () => {
       const mintInfo = await token.getMintInfo();
       assert.equal(mintInfo.supply.toString(), new u64(0).toString());
 
+      // make rpc call to create the VestingContract
+      try {
+        await program.rpc.createVestingContract({
+          accounts: {
+            signer: provider.wallet.publicKey
+          }
+        })
+      } catch(err) {
+        console.error((err as Error).toString());
+        throw err;
+      }
+
       // TODO: test that the a new TokenAccount for the mint is created
+
 
       // TODO: test that the VestingContract account was created
 
