@@ -10,6 +10,7 @@ pub mod psy_vesting {
     use super::*;
     pub fn create_vesting_contract(ctx: Context<CreateVestingContract>, vesting_schedule: Vec<Vest>) -> ProgramResult {
         let vesting_contract = &mut ctx.accounts.vesting_contract;
+        vesting_contract.issuer_address = *ctx.accounts.authority.key;
         vesting_contract.destination_address = *ctx.accounts.destination_address.key;
         vesting_contract.mint_address = ctx.accounts.token_mint.key();
         vesting_contract.token_vault = ctx.accounts.token_vault.key();
@@ -137,7 +138,7 @@ pub struct CreateVestingContract<'info> {
         init,
         payer = authority,
         // The 8 is to account for anchors hash prefix
-        space = 8 + std::mem::size_of::<Pubkey>() * 4 as usize + std::mem::size_of::<Vest>() * vesting_schedule.len() as usize
+        space = 8 + std::mem::size_of::<Pubkey>() * 5 as usize + std::mem::size_of::<Vest>() * vesting_schedule.len() as usize
     )]
     pub vesting_contract: Account<'info, VestingContract>,
 
@@ -191,6 +192,8 @@ impl<'info> TransferVested<'info> {
 #[account]
 #[derive(Default)]
 pub struct VestingContract {
+    /// The SOL address that paid for the rent and should get it back
+    pub issuer_address: Pubkey,
 	/// The destination for the tokens when they are vested
 	pub destination_address: Pubkey,
 	/// Optional authority that can extend the vesting date

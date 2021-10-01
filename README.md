@@ -1,4 +1,4 @@
-#We want a custom vesting contract that will allow users to be an *update_authority* on the vesting so they can extend the vesting and lockup. 
+We want a custom vesting contract that will allow users to be an *update_authority* on the vesting so they can extend the vesting and lockup. 
 
 ```rust
 struct VestingContract {
