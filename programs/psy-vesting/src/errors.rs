@@ -10,4 +10,6 @@ pub enum ErrorCode {
   NewDateMustBeInTheFuture,
   #[msg("New date must be later than the previous date")]
   NewDateMustBeLaterThanCurrent,
+  #[msg("Destination address must match VestingContract")]
+  DestinationMustMatchVestingContract,
 }
