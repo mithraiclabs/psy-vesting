@@ -11,8 +11,14 @@ pub mod psy_vesting {
         vesting_contract.destination_address = *ctx.accounts.destination_address.key;
         vesting_contract.mint_address = ctx.accounts.token_mint.key();
         vesting_contract.token_vault = ctx.accounts.token_vault.key();
-        vesting_contract.update_authority = ctx.accounts.update_authority.key();
         vesting_contract.schedule = vesting_schedule;
+
+        // Check if there is an update authority in the remaining_accounts.
+        let account_info_iter = &mut ctx.remaining_accounts.iter();
+        if account_info_iter.len() > 0 {
+            let update_authority = next_account_info(account_info_iter)?;
+            vesting_contract.update_authority = update_authority.key();
+        }
 
         Ok(())
     }
@@ -25,8 +31,6 @@ pub struct CreateVestingContract<'info> {
     pub authority: Signer<'info>,
     /// The destination for the tokens when they are vested
     pub destination_address: AccountInfo<'info>,
-    /// Optional update authority
-    pub update_authority: AccountInfo<'info>,
     pub token_mint: Box<Account<'info, Mint>>,
     #[account(
         init,
