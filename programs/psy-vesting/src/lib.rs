@@ -1,3 +1,5 @@
+pub mod errors;
+
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Mint, TokenAccount, Transfer};
 
@@ -42,6 +44,37 @@ pub mod psy_vesting {
         vesting_contract.schedule = schedule;
         Ok(())
     }
+
+    #[access_control(UpdateVestingSchedule::accounts(&ctx))]
+    pub fn update_vesting_schedule(ctx: Context<UpdateVestingSchedule>, vesting_schedule: Vec<Vest>) -> ProgramResult {
+        // sort the vesting scheule 
+        let mut schedule = vesting_schedule.clone();
+        schedule.sort_by_key(|x| x.unlock_date);
+
+        let vesting_contract = &mut ctx.accounts.vesting_contract;
+
+        let clock = Clock::get()?;
+
+        for (i, vest) in schedule.iter().enumerate() {
+            // check that the amounts have not changed
+            if vesting_contract.schedule[i].amount != vest.amount {
+                return Err(errors::ErrorCode::CannotChangeAmount.into())
+            }
+            msg!("Clock {:?} {:?}", clock.unix_timestamp, vest.unlock_date);
+            // check that the date has not passed
+            if clock.unix_timestamp > vest.unlock_date {
+                return Err(errors::ErrorCode::NewDateMustBeInTheFuture.into())
+            }
+            // check that the date is ahead of the current unlock date
+            if vesting_contract.schedule[i].unlock_date > vest.unlock_date {
+                return Err(errors::ErrorCode::NewDateMustBeLaterThanCurrent.into())
+            }
+        }
+        // update the vesting_contract
+        vesting_contract.schedule = schedule;
+
+        Ok(())
+    }
 }
 
 #[derive(Accounts)]
@@ -76,6 +109,27 @@ pub struct CreateVestingContract<'info> {
     pub rent: Sysvar<'info, Rent>,
     pub system_program: AccountInfo<'info>,
 }
+
+#[derive(Accounts)]
+pub struct UpdateVestingSchedule<'info> {
+    pub authority: Signer<'info>,
+    /// The VestingContract account to update
+    #[account(mut)]
+    pub vesting_contract: Account<'info, VestingContract>,
+}
+
+impl<'info> UpdateVestingSchedule<'info> {
+    pub fn accounts(ctx: &Context<UpdateVestingSchedule>) -> ProgramResult {
+        // Validate the update_authority on the VestingContract is the signer
+        if *ctx.accounts.authority.key != ctx.accounts.vesting_contract.update_authority {
+            return Err(errors::ErrorCode::SignerMustBeUpdateAuthority.into())
+        }
+        Ok(())
+    }
+}
+
+
+
 
 #[account]
 #[derive(Default)]

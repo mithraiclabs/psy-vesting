@@ -4,7 +4,7 @@ import { BN, Program } from "@project-serum/anchor";
 
 const textEncoder = new TextEncoder();
 
-type Vest = {
+export type Vest = {
   amount: BN;
   unlockDate: BN;
   claimed: boolean;
