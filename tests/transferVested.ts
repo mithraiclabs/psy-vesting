@@ -107,7 +107,8 @@ describe("psy-vesting transferVested", () => {
     })
   })
 
-  // TODO: Nice to have - test that the incorrect token mint returns an error
+  // TODO: Nice to have - test that the incorrect token mint returns an error 
+  //    (this will already error by SPL Token program Transfer instruction fail)
 
-  // TODO: Might be optional - test and error if there are no vested tokens
+  // TODO: Nice to have - test and error if there are no vested tokens
 });
