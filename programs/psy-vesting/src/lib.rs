@@ -51,10 +51,15 @@ pub mod psy_vesting {
         let mut schedule = vesting_schedule.clone();
         schedule.sort_by_key(|x| x.unlock_date);
 
-        // TODO: check that the amounts have not changed
-
-        // update the vesting_contract
         let vesting_contract = &mut ctx.accounts.vesting_contract;
+        
+        // check that the amounts have not changed
+        for (i, vest) in schedule.iter().enumerate() {
+            if vesting_contract.schedule[i].amount != vest.amount {
+                return Err(errors::ErrorCode::CannotChangeAmount.into())
+            }
+        }
+        // update the vesting_contract
         vesting_contract.schedule = schedule;
 
         Ok(())

@@ -4,4 +4,6 @@ use anchor_lang::prelude::*;
 pub enum ErrorCode {
   #[msg("Signer must be the update authority")]
   SignerMustBeUpdateAuthority,
+  #[msg("Cannot change the amount")]
+  CannotChangeAmount,
 }

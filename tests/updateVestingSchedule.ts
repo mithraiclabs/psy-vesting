@@ -75,6 +75,7 @@ describe("psy-vesting updateVestingSchedule", () => {
   })
 
   describe("signer is not the update authority", () => {
+    // test case when the update authority does not sign
     it("should throw error", async () => {
       // make request to update the vesting schedule
       try {
@@ -92,10 +93,31 @@ describe("psy-vesting updateVestingSchedule", () => {
     })
   });
 
-  // TODO: test error is thrown when amount is changed
+  describe("when amount was changed", () => {
+    // test error is thrown when amount is changed
+    const amountChangedItem = {
+      amount: new anchor.BN(10),
+      unlockDate: new anchor.BN(new Date().getTime() / 1000 + 400), // 400 sec from now
+      claimed: false,
+    }
+    it("should throw error", async () => {
+      // make request to update the vesting schedule
+      try {
+        await program.rpc.updateVestingSchedule([item2, amountChangedItem], {
+          accounts: {
+            authority: payer.publicKey,
+            vestingContract: vestingContractKeypair.publicKey
+          },
+          signers: [payer]
+        })
+        assert.ok(false);
+      } catch(err) {
+        const errMsg = "Cannot change the amount";
+        assert.equal((err as Error).toString(), errMsg);
+      }
+    })
+  })
 
-
-  // TODO: test case when the update authority does not sign
   // TODO: test bad case when trying to change unlockDate that has already passed
   // TODO: test case when trying to change Vest where claimed is true
 
