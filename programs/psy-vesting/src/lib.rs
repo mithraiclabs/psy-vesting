@@ -76,6 +76,7 @@ pub mod psy_vesting {
         Ok(())
     }
 
+    #[access_control(TransferVested::accounts(&ctx))]
     pub fn transfer_vested(ctx: Context<TransferVested>, vault_authority_bump: u8) -> ProgramResult {
         // sum the amount of tokens that have vested
         let vesting_contract = &mut ctx.accounts.vesting_contract;
@@ -175,6 +176,15 @@ pub struct TransferVested<'info> {
     pub token_mint: Account<'info, Mint>,
 
     pub token_program: AccountInfo<'info>
+}
+impl<'info> TransferVested<'info> {
+    pub fn accounts(ctx: &Context<TransferVested>) -> ProgramResult {
+        // Validate the destination address is the same as the VestingContract
+        if ctx.accounts.vesting_contract.destination_address != ctx.accounts.destination_address.key() {
+            return Err(errors::ErrorCode::DestinationMustMatchVestingContract.into())
+        }
+        Ok(())
+    }
 }
 
 

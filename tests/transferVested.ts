@@ -12,7 +12,7 @@ describe("psy-vesting transferVested", () => {
   const payer = anchor.web3.Keypair.generate();
 
   let tokenKeypair: Keypair, token: Token, signerTokenAccount: PublicKey, tokenMintInfo: MintInfo;
-  let tokenVaultKey: PublicKey, vestingContractKeypair: Keypair, vaultAuthorityKey: PublicKey, vaultAuthorityBump: number;
+  let tokenVaultKey: PublicKey, vestingContractKeypair: Keypair, vaultAuthorityKey: PublicKey, vaultAuthorityBump: number, destinationAddress: PublicKey;
   const item1 = {
     amount: new anchor.BN(1),
     unlockDate: new anchor.BN(new Date().getTime() / 1000 - 400), // 400 sec in the past
@@ -42,11 +42,12 @@ describe("psy-vesting transferVested", () => {
    const amount = new anchor.BN(10_000_000).mul(new anchor.BN(10).pow(new anchor.BN(tokenMintInfo.decimals)));
    // mint 10,000,000 of tokens to the 
    await token.mintTo(signerTokenAccount, payer.publicKey, [], amount.toNumber());
+   destinationAddress = await token.createAssociatedTokenAccount(payer.publicKey);
    // create vesting schedule with update authority
    ({tokenVaultKey, vestingContractKeypair, vaultAuthorityKey, vaultAuthorityBump} = await createVestingContract(
      program,
      signerTokenAccount,
-     payer.publicKey,
+     destinationAddress,
      token.publicKey,
      vestingSchedule,
      payer.publicKey
@@ -55,12 +56,12 @@ describe("psy-vesting transferVested", () => {
 
   describe("A vesting period has passed", () => {
     it("should transfer total tokens to the destination address", async () => {
-      const destBefore = await token.getAccountInfo(signerTokenAccount)
+      const destBefore = await token.getAccountInfo(destinationAddress)
       // make rpc call to transferVested
       try {
         await program.rpc.transferVested(vaultAuthorityBump, {
           accounts: {
-            destinationAddress: signerTokenAccount,
+            destinationAddress,
             tokenVault: tokenVaultKey,
             vestingContract: vestingContractKeypair.publicKey,
             vaultAuthority: vaultAuthorityKey,
@@ -74,16 +75,37 @@ describe("psy-vesting transferVested", () => {
       }
 
       // test that the destination address received the correct amount of tokens
-      const destAfter = await token.getAccountInfo(signerTokenAccount)
+      const destAfter = await token.getAccountInfo(destinationAddress)
       const destDiff = destAfter.amount.sub(destBefore.amount)
       assert.ok(destDiff.eq(item1.amount))
       // test that claimed is changed to true
       const vestingContract = await program.account.vestingContract.fetch(vestingContractKeypair.publicKey);
       assert.ok(vestingContract.schedule[0].claimed)
+      assert.ok(!vestingContract.schedule[1].claimed)
     })
   })
 
-  // TODO: Test that incorrect desination address returns an error
+  describe("incorrect destination address", () => {
+    // Test that incorrect desination address returns an errorz
+    it("should error", async () => {
+      try {
+        await program.rpc.transferVested(vaultAuthorityBump, {
+          accounts: {
+            destinationAddress: signerTokenAccount,
+            tokenVault: tokenVaultKey,
+            vestingContract: vestingContractKeypair.publicKey,
+            vaultAuthority: vaultAuthorityKey,
+            tokenMint: token.publicKey,
+            tokenProgram: TOKEN_PROGRAM_ID
+          }
+        })
+        assert.ok(false);
+      } catch(err) {
+        const errMsg = "Destination address must match VestingContract";
+        assert.equal((err as Error).toString(), errMsg);
+      }
+    })
+  })
 
   // TODO: Nice to have - test that the incorrect token mint returns an error
 
