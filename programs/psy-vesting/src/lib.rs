@@ -42,6 +42,22 @@ pub mod psy_vesting {
         vesting_contract.schedule = schedule;
         Ok(())
     }
+
+    pub fn update_vesting_schedule(ctx: Context<UpdateVestingSchedule>, vesting_schedule: Vec<Vest>) -> ProgramResult {
+        // TODO: Validate the update_authority on the VestingContract is the signer
+
+        // sort the vesting scheule 
+        let mut schedule = vesting_schedule.clone();
+        schedule.sort_by_key(|x| x.unlock_date);
+
+        // TODO: check that the amounts have not changed
+
+        // update the vesting_contract
+        let vesting_contract = &mut ctx.accounts.vesting_contract;
+        vesting_contract.schedule = schedule;
+
+        Ok(())
+    }
 }
 
 #[derive(Accounts)]
@@ -75,6 +91,14 @@ pub struct CreateVestingContract<'info> {
     pub token_program: AccountInfo<'info>,
     pub rent: Sysvar<'info, Rent>,
     pub system_program: AccountInfo<'info>,
+}
+
+#[derive(Accounts)]
+pub struct UpdateVestingSchedule<'info> {
+    pub authority: Signer<'info>,
+    /// The VestingContract account to update
+    #[account(mut)]
+    pub vesting_contract: Account<'info, VestingContract>,
 }
 
 #[account]
