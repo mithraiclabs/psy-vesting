@@ -1,7 +1,7 @@
 import * as anchor from "@project-serum/anchor";
 import { MintInfo, Token, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { Keypair, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
-import { assert } from "chai";
+import { assert, expect } from "chai";
 import { createVestingContract, initNewTokenMint, Vest } from "./utils";
 
 describe("psy-vesting closeVestingContract", () => {
@@ -69,13 +69,13 @@ describe("psy-vesting closeVestingContract", () => {
     })
     it("should transfer the lamports to the desired address", async () => {
       const issuerAcctInfoBefore = await provider.connection.getAccountInfo(program.provider.wallet.publicKey);
-      const contractAcctBefore = await provider.connection.getAccountInfo(vestingContractKeypair.publicKey)
       // Get the issuer
       const vestingContract = await program.account.vestingContract.fetch(vestingContractKeypair.publicKey);
-      // TODO: make call to close VestingContract
+      // make call to close VestingContract
       try {
         await program.rpc.closeVestingContract({
           accounts: {
+            issuer: vestingContract.issuerAddress,
             vestingContract: vestingContractKeypair.publicKey,
           }
         })
@@ -83,21 +83,16 @@ describe("psy-vesting closeVestingContract", () => {
         console.error(err);
         throw err;
       }
-      // TODO: Validate the vesting contract account has 0 lamports
+      // Validate the vesting contract account has 0 lamports
       const contractAcctAfter = await provider.connection.getAccountInfo(vestingContractKeypair.publicKey)
-      if (!contractAcctBefore || !contractAcctAfter) {
-        throw new Error("cannot load contract account info")
-      }
-      assert.equal(contractAcctAfter.lamports, 0)
+      assert.ok(!contractAcctAfter)
 
-      // TODO: Validate the issuer got the lamports
-      const contractAcctDiff = contractAcctAfter.lamports - contractAcctBefore.lamports;
+      // Validate the issuer got the lamports
       const issuerAcctInfo = await provider.connection.getAccountInfo(program.provider.wallet.publicKey);
       if (!issuerAcctInfo || !issuerAcctInfoBefore) {
         throw new Error("Cannot load issuer account info");
       }
-      const issuerAcctDiff = issuerAcctInfo.lamports - issuerAcctInfoBefore.lamports;
-      assert.equal(issuerAcctDiff, contractAcctDiff);
+      expect(issuerAcctInfo.lamports).to.greaterThan(issuerAcctInfoBefore.lamports)
     })
   })
 

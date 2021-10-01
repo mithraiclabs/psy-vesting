@@ -112,6 +112,10 @@ pub mod psy_vesting {
         token::transfer(cpi_ctx, total_vested)?;
         Ok(())
     }
+
+    pub fn close_vesting_contract(ctx: Context<CloseVestingContract>) -> ProgramResult {
+        Ok(())
+    }
 }
 
 #[derive(Accounts)]
@@ -186,6 +190,14 @@ impl<'info> TransferVested<'info> {
         }
         Ok(())
     }
+}
+
+#[derive(Accounts)]
+pub struct CloseVestingContract<'info> {
+    #[account(mut)]
+    pub issuer: AccountInfo<'info>,
+    #[account(mut, close = issuer)]
+    pub vesting_contract: Account<'info, VestingContract>,
 }
 
 
