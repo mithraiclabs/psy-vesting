@@ -84,7 +84,7 @@ pub mod psy_vesting {
         let clock = Clock::get()?;
         let mut schedule = vesting_contract.schedule.clone();
         for (i, vest) in vesting_contract.schedule.iter().enumerate() {
-            if clock.unix_timestamp > vest.unlock_date {
+            if !vest.claimed && clock.unix_timestamp > vest.unlock_date {
                 total_vested += vest.amount;
                 // while summing, update the claimed to true
                 schedule[i].claimed = true;

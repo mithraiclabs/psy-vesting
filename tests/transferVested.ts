@@ -1,4 +1,5 @@
 import * as anchor from "@project-serum/anchor"
+import { BN } from "@project-serum/anchor";
 import { MintInfo, Token, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { Keypair, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import { assert } from "chai";
@@ -24,7 +25,7 @@ describe("psy-vesting transferVested", () => {
     claimed: false,
   }
   let vestingSchedule: Vest[] = [item1, item2]
-  before(async () => {
+  beforeEach(async () => {
     // Send lamports to payer wallet
     await provider.connection.confirmTransaction(
       await provider.connection.requestAirdrop(
@@ -104,6 +105,49 @@ describe("psy-vesting transferVested", () => {
         const errMsg = "Destination address must match VestingContract";
         assert.equal((err as Error).toString(), errMsg);
       }
+    })
+  })
+
+  describe("a past vesting item has already been claimed", () => {
+    beforeEach(async () => {
+      await program.rpc.transferVested(vaultAuthorityBump, {
+        accounts: {
+          destinationAddress,
+          tokenVault: tokenVaultKey,
+          vestingContract: vestingContractKeypair.publicKey,
+          vaultAuthority: vaultAuthorityKey,
+          tokenMint: token.publicKey,
+          tokenProgram: TOKEN_PROGRAM_ID
+        }
+      })
+    })
+    // Test that claimed tokens can't get claimed again
+    it("should exclude counting them in the total transfer", async () => {
+      const destBefore = await token.getAccountInfo(destinationAddress)
+      const vestingContract = await program.account.vestingContract.fetch(vestingContractKeypair.publicKey);
+      const schedule: Vest[] = vestingContract.schedule;
+      const totalToClaim = schedule.reduce((acc, curr) => 
+        ( curr.claimed || curr.unlockDate > new anchor.BN(new Date().getTime() / 1000) ) ? acc : curr.amount.add(acc), new BN(0)
+      );
+      try {
+        await program.rpc.transferVested(vaultAuthorityBump, {
+          accounts: {
+            destinationAddress,
+            tokenVault: tokenVaultKey,
+            vestingContract: vestingContractKeypair.publicKey,
+            vaultAuthority: vaultAuthorityKey,
+            tokenMint: token.publicKey,
+            tokenProgram: TOKEN_PROGRAM_ID
+          }
+        })
+      } catch(err) {
+        console.error(err);
+        throw err;
+      }
+      // test that the destination address received the correct amount of tokens
+      const destAfter = await token.getAccountInfo(destinationAddress)
+      const destDiff = destAfter.amount.sub(destBefore.amount)
+      assert.ok(destDiff.eq(totalToClaim))
     })
   })
 
