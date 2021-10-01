@@ -2,7 +2,7 @@ import { initNewTokenMint } from "./utils";
 import * as anchor from "@project-serum/anchor"
 import { Keypair, LAMPORTS_PER_SOL, PublicKey, SystemProgram, SYSVAR_RENT_PUBKEY } from "@solana/web3.js";
 import { Token, TOKEN_PROGRAM_ID, u64 } from "@solana/spl-token";
-import { assert } from "chai";
+import { assert, expect } from "chai";
 
 const textEncoder = new TextEncoder();
 
@@ -46,14 +46,14 @@ describe('psy-vesting createVestingContract', () => {
       ], program.programId)
 
       const vestingSchedule = [{
-        amount: 10,
-        unlock_date: new anchor.BN(new Date().getTime() / 1000 + 3), // 3 sec from now
+        amount: new anchor.BN(10),
+        unlockDate: new anchor.BN(new Date().getTime() / 1000 + 3), // 3 sec from now
         claimed: false,
       }]
 
       // make rpc call to create the VestingContract
       try {
-        await program.rpc.createVestingContract(vestingSchedule.length, {
+        await program.rpc.createVestingContract(vestingSchedule, {
           accounts: {
             authority: provider.wallet.publicKey,
             destinationAddress: payer.publicKey,
@@ -86,7 +86,8 @@ describe('psy-vesting createVestingContract', () => {
       assert.ok(vestingContract.mintAddress.equals(token.publicKey))
       assert.ok(vestingContract.tokenVault.equals(tokenVaultKey))
 
-      // TODO: Test that the Vest array was stored properly
+      // Test that the Vest array was stored properly
+      expect(JSON.stringify(vestingContract.schedule)).to.eql(JSON.stringify(vestingSchedule));
 
     })
   })

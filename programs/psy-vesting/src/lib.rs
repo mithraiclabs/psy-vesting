@@ -6,18 +6,20 @@ declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 #[program]
 pub mod psy_vesting {
     use super::*;
-    pub fn create_vesting_contract(ctx: Context<CreateVestingContract>, _vesting_item_length: u8) -> ProgramResult {
+    pub fn create_vesting_contract(ctx: Context<CreateVestingContract>, vesting_schedule: Vec<Vest>) -> ProgramResult {
         let vesting_contract = &mut ctx.accounts.vesting_contract;
-
         vesting_contract.destination_address = *ctx.accounts.destination_address.key;
         vesting_contract.mint_address = ctx.accounts.token_mint.key();
         vesting_contract.token_vault = ctx.accounts.token_vault.key();
+        vesting_contract.schedule = vesting_schedule;
+        msg!("length {:?}", vesting_contract.schedule);
+
         Ok(())
     }
 }
 
 #[derive(Accounts)]
-#[instruction(vesting_item_length: u8)]
+#[instruction(vesting_schedule: Vec<Vest>)]
 pub struct CreateVestingContract<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
@@ -37,7 +39,8 @@ pub struct CreateVestingContract<'info> {
     #[account(
         init,
         payer = authority,
-        space = 32 * 4 as usize + std::mem::size_of::<Vest>() * vesting_item_length as usize
+        // The 8 is to account for anchors hash prefix
+        space = 8 + std::mem::size_of::<Pubkey>() * 4 as usize + std::mem::size_of::<Vest>() * vesting_schedule.len() as usize
     )]
     pub vesting_contract: Account<'info, VestingContract>,
 
@@ -62,12 +65,12 @@ pub struct VestingContract {
 }
 
 // The size of the Vest is 8 + 8 + 1 = 17 bytes
-#[derive(Clone, AnchorSerialize, AnchorDeserialize)]
+#[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct Vest {
 	/// The amount that unlocks at the date
-	pub amount: Pubkey,
+	pub amount: u64,
 	/// The current unlock date
-	pub unlock_date: Pubkey,
+	pub unlock_date: i64,
 	/// Flag that the vesting has been claimed
 	pub claimed: bool,
 }
