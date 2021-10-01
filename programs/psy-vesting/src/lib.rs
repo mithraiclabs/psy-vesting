@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{Mint, TokenAccount};
+use anchor_spl::token::{self, Mint, TokenAccount, Transfer};
 
 declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 
@@ -11,7 +11,9 @@ pub mod psy_vesting {
         vesting_contract.destination_address = *ctx.accounts.destination_address.key;
         vesting_contract.mint_address = ctx.accounts.token_mint.key();
         vesting_contract.token_vault = ctx.accounts.token_vault.key();
-        vesting_contract.schedule = vesting_schedule;
+        // sort the vesting schedule keys
+        let mut schedule = vesting_schedule.clone();
+        schedule.sort_by_key(|x| x.unlock_date);
 
         // Check if there is an update authority in the remaining_accounts.
         let account_info_iter = &mut ctx.remaining_accounts.iter();
@@ -20,6 +22,24 @@ pub mod psy_vesting {
             vesting_contract.update_authority = update_authority.key();
         }
 
+        // Sum the total amount from the vesting schedule
+        let mut total: u64 = 0;
+        for vest in schedule.clone() {
+            total += vest.amount;
+        }
+
+        // Transfer the total amount from the issuer account
+        let cpi_accounts = Transfer {
+            from: ctx.accounts.token_src.to_account_info(),
+            to: ctx.accounts.token_vault.to_account_info(),
+            authority: ctx.accounts.authority.to_account_info(),
+        };
+        let cpi_token_program = ctx.accounts.token_program.clone();
+        let cpi_ctx = CpiContext::new(cpi_token_program, cpi_accounts);
+        token::transfer(cpi_ctx, total)?;
+
+
+        vesting_contract.schedule = schedule;
         Ok(())
     }
 }
@@ -29,6 +49,8 @@ pub mod psy_vesting {
 pub struct CreateVestingContract<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
+    #[account(mut)]
+    pub token_src: AccountInfo<'info>,
     /// The destination for the tokens when they are vested
     pub destination_address: AccountInfo<'info>,
     pub token_mint: Box<Account<'info, Mint>>,
