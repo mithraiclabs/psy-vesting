@@ -1,6 +1,50 @@
-import {Connection, Keypair, PublicKey, sendAndConfirmTransaction, SystemProgram, Transaction} from "@solana/web3.js"
+import {Connection, Keypair, PublicKey, sendAndConfirmTransaction, SystemProgram, SYSVAR_RENT_PUBKEY, Transaction} from "@solana/web3.js"
 import {MintLayout, Token, TOKEN_PROGRAM_ID} from "@solana/spl-token"
+import { BN, Program } from "@project-serum/anchor";
 
+const textEncoder = new TextEncoder();
+
+type Vest = {
+  amount: BN;
+  unlockDate: BN;
+  claimed: boolean;
+}
+
+export const createVestingContract = async (
+  program: Program,
+  destinationKey: PublicKey,
+  updateAuthority: PublicKey,
+  tokenMint: PublicKey,
+
+  vestingSchedule: Vest[],
+) => {
+  const vestingContractKeypair = new Keypair();
+  
+  const [tokenVaultKey, tokenVaultBump] = await PublicKey.findProgramAddress([
+    destinationKey.toBuffer(), tokenMint.toBuffer(), textEncoder.encode("vault")
+  ], program.programId)
+
+  const [vaultAuthorityKey, vaultAuthorityBump] = await PublicKey.findProgramAddress([
+    destinationKey.toBuffer(), tokenMint.toBuffer(), textEncoder.encode("vaultAuth")
+  ], program.programId)
+  await program.rpc.createVestingContract(vestingSchedule, {
+    accounts: {
+      authority: program.provider.wallet.publicKey,
+      destinationAddress: destinationKey,
+      updateAuthority,
+      tokenMint,
+      tokenVault: tokenVaultKey,
+      vaultAuthority: vaultAuthorityKey,
+      vestingContract: vestingContractKeypair.publicKey,
+
+      tokenProgram: TOKEN_PROGRAM_ID,
+      systemProgram: SystemProgram.programId,
+      rent: SYSVAR_RENT_PUBKEY,
+    },
+    signers: [vestingContractKeypair]
+  })
+  return {tokenVaultKey, vestingContractKeypair}
+}
 
 
 export const initNewTokenMint = async (

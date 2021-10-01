@@ -1,4 +1,4 @@
-import { initNewTokenMint } from "./utils";
+import { createVestingContract, initNewTokenMint } from "./utils";
 import * as anchor from "@project-serum/anchor"
 import { Keypair, LAMPORTS_PER_SOL, PublicKey, SystemProgram, SYSVAR_RENT_PUBKEY } from "@solana/web3.js";
 import { Token, TOKEN_PROGRAM_ID, u64 } from "@solana/spl-token";
@@ -32,18 +32,10 @@ describe('psy-vesting createVestingContract', () => {
 
   describe("Given a valid SPL Token Mint and vesting information", () => {
     it("should create a valid VestingContract", async () => {
-      const vestingContractKeypair = new Keypair();
       // Test that the mint exists
       const mintInfo = await token.getMintInfo();
       assert.equal(mintInfo.supply.toString(), new u64(0).toString());
 
-      const [tokenVaultKey, tokenVaultBump] = await PublicKey.findProgramAddress([
-        payer.publicKey.toBuffer(), token.publicKey.toBuffer(), textEncoder.encode("vault")
-      ], program.programId)
-
-      const [vaultAuthorityKey, vaultAuthorityBump] = await PublicKey.findProgramAddress([
-        payer.publicKey.toBuffer(), token.publicKey.toBuffer(), textEncoder.encode("vaultAuth")
-      ], program.programId)
 
       const vestingSchedule = [{
         amount: new anchor.BN(10),
@@ -52,23 +44,9 @@ describe('psy-vesting createVestingContract', () => {
       }]
 
       // make rpc call to create the VestingContract
+      let tokenVaultKey: PublicKey, vestingContractKeypair: Keypair;
       try {
-        await program.rpc.createVestingContract(vestingSchedule, {
-          accounts: {
-            authority: provider.wallet.publicKey,
-            destinationAddress: payer.publicKey,
-            updateAuthority: payer.publicKey,
-            tokenMint: token.publicKey,
-            tokenVault: tokenVaultKey,
-            vaultAuthority: vaultAuthorityKey,
-            vestingContract: vestingContractKeypair.publicKey,
-
-            tokenProgram: TOKEN_PROGRAM_ID,
-            systemProgram: SystemProgram.programId,
-            rent: SYSVAR_RENT_PUBKEY,
-          },
-          signers: [vestingContractKeypair]
-        })
+        ({tokenVaultKey, vestingContractKeypair} = await createVestingContract(program, payer.publicKey, payer.publicKey, token.publicKey, vestingSchedule));
       } catch(err) {
         console.error((err as Error).toString());
         throw err;
