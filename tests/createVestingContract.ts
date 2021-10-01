@@ -57,6 +57,7 @@ describe('psy-vesting createVestingContract', () => {
           accounts: {
             authority: provider.wallet.publicKey,
             destinationAddress: payer.publicKey,
+            updateAuthority: payer.publicKey,
             tokenMint: token.publicKey,
             tokenVault: tokenVaultKey,
             vaultAuthority: vaultAuthorityKey,
@@ -85,6 +86,7 @@ describe('psy-vesting createVestingContract', () => {
       // test that the new token account is stored on the VestingContract
       assert.ok(vestingContract.mintAddress.equals(token.publicKey))
       assert.ok(vestingContract.tokenVault.equals(tokenVaultKey))
+      assert.ok(vestingContract.updateAuthority.equals(payer.publicKey))
 
       // Test that the Vest array was stored properly
       expect(JSON.stringify(vestingContract.schedule)).to.eql(JSON.stringify(vestingSchedule));

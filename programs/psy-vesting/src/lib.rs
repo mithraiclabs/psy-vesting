@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, Mint, TokenAccount};
+use anchor_spl::token::{Mint, TokenAccount};
 
 declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 
@@ -11,8 +11,8 @@ pub mod psy_vesting {
         vesting_contract.destination_address = *ctx.accounts.destination_address.key;
         vesting_contract.mint_address = ctx.accounts.token_mint.key();
         vesting_contract.token_vault = ctx.accounts.token_vault.key();
+        vesting_contract.update_authority = ctx.accounts.update_authority.key();
         vesting_contract.schedule = vesting_schedule;
-        msg!("length {:?}", vesting_contract.schedule);
 
         Ok(())
     }
@@ -25,6 +25,8 @@ pub struct CreateVestingContract<'info> {
     pub authority: Signer<'info>,
     /// The destination for the tokens when they are vested
     pub destination_address: AccountInfo<'info>,
+    /// Optional update authority
+    pub update_authority: AccountInfo<'info>,
     pub token_mint: Box<Account<'info, Mint>>,
     #[account(
         init,
