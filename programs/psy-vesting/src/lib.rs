@@ -65,7 +65,10 @@ pub mod psy_vesting {
             if clock.unix_timestamp > vest.unlock_date {
                 return Err(errors::ErrorCode::NewDateMustBeInTheFuture.into())
             }
-            // TODO check that the date is ahead of the current unlock date
+            // check that the date is ahead of the current unlock date
+            if vesting_contract.schedule[i].unlock_date > vest.unlock_date {
+                return Err(errors::ErrorCode::NewDateMustBeLaterThanCurrent.into())
+            }
         }
         // update the vesting_contract
         vesting_contract.schedule = schedule;

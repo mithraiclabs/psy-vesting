@@ -8,4 +8,6 @@ pub enum ErrorCode {
   CannotChangeAmount,
   #[msg("New date must be in the future")]
   NewDateMustBeInTheFuture,
+  #[msg("New date must be later than the previous date")]
+  NewDateMustBeLaterThanCurrent,
 }

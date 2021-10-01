@@ -140,7 +140,29 @@ describe("psy-vesting updateVestingSchedule", () => {
       }
     })
   })
-  // TODO: test error case when trying to change the unlockDate that is prior to the existing unlock date
+  describe("unlock date is prior to current unlock", () => {
+    // test error case when trying to change the unlockDate that is prior to the existing unlock date
+    it("should error", async () => {
+      const dateHasPassed = {
+        amount: new anchor.BN(1),
+        unlockDate: item1.unlockDate.subn(100),
+        claimed: false,
+      }
+      try {
+        await program.rpc.updateVestingSchedule([item2, dateHasPassed], {
+          accounts: {
+            authority: payer.publicKey,
+            vestingContract: vestingContractKeypair.publicKey
+          },
+          signers: [payer]
+        })
+        assert.ok(false);
+      } catch(err) {
+        const errMsg = "New date must be later than the previous date";
+        assert.equal((err as Error).toString(), errMsg);
+      }
+    })
+  })
 
   // TODO: test case when trying to change Vest where claimed is true
 
