@@ -31,7 +31,7 @@ describe('psy-vesting createVestingContract', () => {
   })
 
   describe("Given a valid SPL Token Mint and vesting information", () => {
-    const vestingSchedule = [{
+    let vestingSchedule = [{
       amount: new anchor.BN(10),
       unlockDate: new anchor.BN(new Date().getTime() / 1000 + 3), // 3 sec from now
       claimed: false,
@@ -80,6 +80,30 @@ describe('psy-vesting createVestingContract', () => {
         }
         const vestingContract = await program.account.vestingContract.fetch(vestingContractKeypair.publicKey);
         assert.ok(vestingContract.updateAuthority.equals(SystemProgram.programId))
+      })
+    })
+    describe("Vesting schedule is out of order", () => {
+      it("should order the schedule", async () => {
+        const destination = anchor.web3.Keypair.generate();
+        const item1 = {
+          amount: new anchor.BN(1),
+          unlockDate: new anchor.BN(new Date().getTime() / 1000 + 3), // 3 sec from now
+          claimed: false,
+        }
+        const item2 = {
+          amount: new anchor.BN(2),
+          unlockDate: new anchor.BN(new Date().getTime() / 1000 + 300), // 3 sec from now
+          claimed: false,
+        }
+        try {
+          ({tokenVaultKey, vestingContractKeypair} = await createVestingContract(program, destination.publicKey, token.publicKey, [item2, item1]));
+        } catch(err) {
+          console.error((err as Error).toString());
+          throw err;
+        }
+        const vestingContract = await program.account.vestingContract.fetch(vestingContractKeypair.publicKey);
+        // Test that the items are ordered properly
+        expect(JSON.stringify(vestingContract.schedule)).to.eql(JSON.stringify([item1, item2]));
       })
     })
   })

@@ -11,7 +11,10 @@ pub mod psy_vesting {
         vesting_contract.destination_address = *ctx.accounts.destination_address.key;
         vesting_contract.mint_address = ctx.accounts.token_mint.key();
         vesting_contract.token_vault = ctx.accounts.token_vault.key();
-        vesting_contract.schedule = vesting_schedule;
+        // sort the vesting schedule keys
+        let mut schedule = vesting_schedule.clone();
+        schedule.sort_by_key(|x| x.unlock_date);
+        vesting_contract.schedule = schedule;
 
         // Check if there is an update authority in the remaining_accounts.
         let account_info_iter = &mut ctx.remaining_accounts.iter();
