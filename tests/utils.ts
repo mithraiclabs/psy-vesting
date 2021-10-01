@@ -12,6 +12,7 @@ type Vest = {
 
 export const createVestingContract = async (
   program: Program,
+  tokenSrc: PublicKey,
   destinationKey: PublicKey,
   tokenMint: PublicKey,
   vestingSchedule: Vest[],
@@ -38,6 +39,7 @@ export const createVestingContract = async (
   await program.rpc.createVestingContract(vestingSchedule, {
     accounts: {
       authority: program.provider.wallet.publicKey,
+      tokenSrc,
       destinationAddress: destinationKey,
       tokenMint,
       tokenVault: tokenVaultKey,

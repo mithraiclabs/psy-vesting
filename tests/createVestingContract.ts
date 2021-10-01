@@ -1,7 +1,7 @@
 import { createVestingContract, initNewTokenMint } from "./utils";
 import * as anchor from "@project-serum/anchor"
 import { Keypair, LAMPORTS_PER_SOL, PublicKey, SystemProgram, SYSVAR_RENT_PUBKEY } from "@solana/web3.js";
-import { Token, TOKEN_PROGRAM_ID, u64 } from "@solana/spl-token";
+import { MintInfo, Token, TOKEN_PROGRAM_ID, u64 } from "@solana/spl-token";
 import { assert, expect } from "chai";
 
 const textEncoder = new TextEncoder();
@@ -14,8 +14,7 @@ describe('psy-vesting createVestingContract', () => {
   const provider = program.provider;
   const payer = anchor.web3.Keypair.generate();
 
-  let tokenKeypair: Keypair,
-  token: Token;
+  let tokenKeypair: Keypair, token: Token, signerTokenAccount: PublicKey, tokenMintInfo: MintInfo;
   before(async () => {
     // Send lamports to payer wallet
     await provider.connection.confirmTransaction(
@@ -28,6 +27,12 @@ describe('psy-vesting createVestingContract', () => {
     // create new token mint
    ({ mintAccount: tokenKeypair} = await initNewTokenMint(provider.connection, payer.publicKey, payer));
    token = new Token(provider.connection, tokenKeypair.publicKey, TOKEN_PROGRAM_ID, payer);
+   tokenMintInfo = await token.getMintInfo();
+   // create a token account for the signer
+   signerTokenAccount = await token.createAssociatedTokenAccount(provider.wallet.publicKey);
+   const amount = new anchor.BN(10_000_000).mul(new anchor.BN(10).pow(new anchor.BN(tokenMintInfo.decimals)));
+   // mint 10,000,000 of tokens to the 
+   await token.mintTo(signerTokenAccount, payer.publicKey, [], amount.toNumber());
   })
 
   describe("Given a valid SPL Token Mint and vesting information", () => {
@@ -40,19 +45,15 @@ describe('psy-vesting createVestingContract', () => {
     it("should create a valid VestingContract", async () => {
       // Test that the mint exists
       const mintInfo = await token.getMintInfo();
-      assert.equal(mintInfo.supply.toString(), new u64(0).toString());
+      assert.equal(mintInfo.supply.toString(), new anchor.BN(10_000_000).mul(new anchor.BN(10).pow(new anchor.BN(tokenMintInfo.decimals))).toString());
 
       // make rpc call to create the VestingContract
       try {
-        ({tokenVaultKey, vestingContractKeypair} = await createVestingContract(program, payer.publicKey, token.publicKey, vestingSchedule, payer.publicKey));
+        ({tokenVaultKey, vestingContractKeypair} = await createVestingContract(program, signerTokenAccount, payer.publicKey, token.publicKey, vestingSchedule, payer.publicKey));
       } catch(err) {
         console.error((err as Error).toString());
         throw err;
       }
-
-      // test that the a new TokenAccount for the mint is created
-      const tokenVaultInfo = await token.getAccountInfo(tokenVaultKey);
-      assert.ok(tokenVaultInfo.amount.eqn(0))
 
       // test that the VestingContract account was created
       const vestingContract = await program.account.vestingContract.fetch(vestingContractKeypair.publicKey);
@@ -67,13 +68,18 @@ describe('psy-vesting createVestingContract', () => {
       // Test that the Vest array was stored properly
       expect(JSON.stringify(vestingContract.schedule)).to.eql(JSON.stringify(vestingSchedule));
 
+      // Test that total amount transfered from the issuer_account to the token account
+      let total = vestingSchedule.reduce((acc, curr) => curr.amount.add(acc), new anchor.BN(0));
+      // test that the a new TokenAccount for the mint is created
+      const tokenVaultInfo = await token.getAccountInfo(tokenVaultKey);
+      assert.ok(tokenVaultInfo.amount.eq(total))
     })
 
     describe("no update authority", () => {
       it("should not store the update authority", async () => {
         const destination = anchor.web3.Keypair.generate();
         try {
-          ({tokenVaultKey, vestingContractKeypair} = await createVestingContract(program, destination.publicKey, token.publicKey, vestingSchedule));
+          ({tokenVaultKey, vestingContractKeypair} = await createVestingContract(program, signerTokenAccount, destination.publicKey, token.publicKey, vestingSchedule));
         } catch(err) {
           console.error((err as Error).toString());
           throw err;
@@ -96,7 +102,7 @@ describe('psy-vesting createVestingContract', () => {
           claimed: false,
         }
         try {
-          ({tokenVaultKey, vestingContractKeypair} = await createVestingContract(program, destination.publicKey, token.publicKey, [item2, item1]));
+          ({tokenVaultKey, vestingContractKeypair} = await createVestingContract(program, signerTokenAccount, destination.publicKey, token.publicKey, [item2, item1]));
         } catch(err) {
           console.error((err as Error).toString());
           throw err;
