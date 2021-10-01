@@ -52,12 +52,20 @@ pub mod psy_vesting {
         schedule.sort_by_key(|x| x.unlock_date);
 
         let vesting_contract = &mut ctx.accounts.vesting_contract;
-        
-        // check that the amounts have not changed
+
+        let clock = Clock::get()?;
+
         for (i, vest) in schedule.iter().enumerate() {
+            // check that the amounts have not changed
             if vesting_contract.schedule[i].amount != vest.amount {
                 return Err(errors::ErrorCode::CannotChangeAmount.into())
             }
+            msg!("Clock {:?} {:?}", clock.unix_timestamp, vest.unlock_date);
+            // check that the date has not passed
+            if clock.unix_timestamp > vest.unlock_date {
+                return Err(errors::ErrorCode::NewDateMustBeInTheFuture.into())
+            }
+            // TODO check that the date is ahead of the current unlock date
         }
         // update the vesting_contract
         vesting_contract.schedule = schedule;

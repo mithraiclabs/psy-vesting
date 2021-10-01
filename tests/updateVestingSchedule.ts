@@ -48,7 +48,7 @@ describe("psy-vesting updateVestingSchedule", () => {
   })
   const newItem1 = {
     amount: new anchor.BN(1),
-    unlockDate: new anchor.BN(new Date().getTime() / 1000 + 400), // 400 sec from now
+    unlockDate: new anchor.BN(new Date().getTime() / 1000 + 500), // 400 sec from now
     claimed: false,
   }
   describe("appropriate use of update", () => {
@@ -117,8 +117,31 @@ describe("psy-vesting updateVestingSchedule", () => {
       }
     })
   })
+  describe("unlock date has already passed", () => {
+    // test bad case when trying to change unlockDate that has already passed
+    it("should error", async () => {
+      const dateHasPassed = {
+        amount: new anchor.BN(1),
+        unlockDate: new anchor.BN(new Date().getTime() / 1000 - 400), // 400 sec from now
+        claimed: false,
+      }
+      try {
+        await program.rpc.updateVestingSchedule([item2, dateHasPassed], {
+          accounts: {
+            authority: payer.publicKey,
+            vestingContract: vestingContractKeypair.publicKey
+          },
+          signers: [payer]
+        })
+        assert.ok(false);
+      } catch(err) {
+        const errMsg = "New date must be in the future";
+        assert.equal((err as Error).toString(), errMsg);
+      }
+    })
+  })
+  // TODO: test error case when trying to change the unlockDate that is prior to the existing unlock date
 
-  // TODO: test bad case when trying to change unlockDate that has already passed
   // TODO: test case when trying to change Vest where claimed is true
 
 })

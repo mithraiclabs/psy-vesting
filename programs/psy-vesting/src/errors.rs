@@ -6,4 +6,6 @@ pub enum ErrorCode {
   SignerMustBeUpdateAuthority,
   #[msg("Cannot change the amount")]
   CannotChangeAmount,
+  #[msg("New date must be in the future")]
+  NewDateMustBeInTheFuture,
 }
