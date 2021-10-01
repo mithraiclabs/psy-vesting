@@ -75,6 +75,39 @@ pub mod psy_vesting {
 
         Ok(())
     }
+
+    pub fn transfer_vested(ctx: Context<TransferVested>, vault_authority_bump: u8) -> ProgramResult {
+        // sum the amount of tokens that have vested
+        let vesting_contract = &mut ctx.accounts.vesting_contract;
+        let mut total_vested: u64 = 0;
+        let clock = Clock::get()?;
+        let schedule = vesting_contract.schedule.clone();
+        for vest in schedule {
+            if clock.unix_timestamp > vest.unlock_date {
+                total_vested += vest.amount;
+                // TODO: while summing, update the claimed to true
+                // vest.claimed = true;
+            }
+        }
+
+        // Transfer the total amount from the token vault to the destination address
+        let cpi_accounts = Transfer {
+            from: ctx.accounts.token_vault.to_account_info(),
+            to: ctx.accounts.destination_address.to_account_info(),
+            authority: ctx.accounts.vault_authority.to_account_info(),
+        };
+        let token_vault_key = ctx.accounts.token_vault.key();
+        let seeds = [
+            token_vault_key.as_ref(),
+            b"vaultAuth",
+            &[vault_authority_bump]
+        ];
+        let signers = &[&seeds[..]];
+        let cpi_token_program = ctx.accounts.token_program.clone();
+        let cpi_ctx = CpiContext::new_with_signer(cpi_token_program, cpi_accounts, signers);
+        token::transfer(cpi_ctx, total_vested)?;
+        Ok(())
+    }
 }
 
 #[derive(Accounts)]
@@ -128,7 +161,18 @@ impl<'info> UpdateVestingSchedule<'info> {
     }
 }
 
+#[derive(Accounts)]
+pub struct TransferVested<'info> {
+    #[account(mut)]
+    pub destination_address: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub token_vault: Account<'info, TokenAccount>,
+    pub vesting_contract: Account<'info, VestingContract>,
+    pub vault_authority: AccountInfo<'info>,
+    pub token_mint: Account<'info, Mint>,
 
+    pub token_program: AccountInfo<'info>
+}
 
 
 #[account]

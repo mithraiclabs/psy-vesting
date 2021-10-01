@@ -25,7 +25,7 @@ export const createVestingContract = async (
   ], program.programId)
 
   const [vaultAuthorityKey, vaultAuthorityBump] = await PublicKey.findProgramAddress([
-    destinationKey.toBuffer(), tokenMint.toBuffer(), textEncoder.encode("vaultAuth")
+    tokenVaultKey.toBuffer(), textEncoder.encode("vaultAuth")
   ], program.programId)
 
   let remainingAccounts: AccountMeta[] = [];
@@ -53,7 +53,7 @@ export const createVestingContract = async (
     remainingAccounts,
     signers: [vestingContractKeypair]
   })
-  return {tokenVaultKey, vestingContractKeypair}
+  return {tokenVaultKey, vestingContractKeypair, vaultAuthorityKey, vaultAuthorityBump}
 }
 
 
