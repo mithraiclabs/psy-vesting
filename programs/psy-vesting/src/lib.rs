@@ -1,3 +1,5 @@
+pub mod errors;
+
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Mint, TokenAccount, Transfer};
 
@@ -43,9 +45,8 @@ pub mod psy_vesting {
         Ok(())
     }
 
+    #[access_control(UpdateVestingSchedule::accounts(&ctx))]
     pub fn update_vesting_schedule(ctx: Context<UpdateVestingSchedule>, vesting_schedule: Vec<Vest>) -> ProgramResult {
-        // TODO: Validate the update_authority on the VestingContract is the signer
-
         // sort the vesting scheule 
         let mut schedule = vesting_schedule.clone();
         schedule.sort_by_key(|x| x.unlock_date);
@@ -100,6 +101,19 @@ pub struct UpdateVestingSchedule<'info> {
     #[account(mut)]
     pub vesting_contract: Account<'info, VestingContract>,
 }
+
+impl<'info> UpdateVestingSchedule<'info> {
+    pub fn accounts(ctx: &Context<UpdateVestingSchedule>) -> ProgramResult {
+        // Validate the update_authority on the VestingContract is the signer
+        if *ctx.accounts.authority.key != ctx.accounts.vesting_contract.update_authority {
+            return Err(errors::ErrorCode::SignerMustBeUpdateAuthority.into())
+        }
+        Ok(())
+    }
+}
+
+
+
 
 #[account]
 #[derive(Default)]

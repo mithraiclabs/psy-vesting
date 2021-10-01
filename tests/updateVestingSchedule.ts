@@ -1,7 +1,7 @@
 import * as anchor from "@project-serum/anchor";
 import { MintInfo, Token, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { Keypair, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
-import { expect } from "chai";
+import { assert, expect } from "chai";
 import { createVestingContract, initNewTokenMint, Vest } from "./utils";
 
 // TODO: clean up the copy pasta
@@ -46,13 +46,13 @@ describe("psy-vesting updateVestingSchedule", () => {
    // create vesting schedule with update authority
    ({tokenVaultKey, vestingContractKeypair} = await createVestingContract(program, signerTokenAccount, payer.publicKey, token.publicKey, vestingSchedule, payer.publicKey));
   })
+  const newItem1 = {
+    amount: new anchor.BN(1),
+    unlockDate: new anchor.BN(new Date().getTime() / 1000 + 400), // 400 sec from now
+    claimed: false,
+  }
   describe("appropriate use of update", () => {
     it("should update the vesting schedule", async () => {
-      const newItem1 = {
-        amount: new anchor.BN(1),
-        unlockDate: new anchor.BN(new Date().getTime() / 1000 + 400), // 400 sec from now
-        claimed: false,
-      }
 
       // make request to update the vesting schedule
       try {
@@ -69,10 +69,28 @@ describe("psy-vesting updateVestingSchedule", () => {
       }
 
       const vestingContract = await program.account.vestingContract.fetch(vestingContractKeypair.publicKey);
-      // TODO: test that the vesting schedule properly updated
+      // test that the vesting schedule properly updated
       expect(JSON.stringify(vestingContract.schedule)).to.eql(JSON.stringify([newItem1, item2]));
     })
   })
+
+  describe("signer is not the update authority", () => {
+    it("should throw error", async () => {
+      // make request to update the vesting schedule
+      try {
+        await program.rpc.updateVestingSchedule([item2, newItem1], {
+          accounts: {
+            authority: provider.wallet.publicKey,
+            vestingContract: vestingContractKeypair.publicKey
+          },
+        })
+        assert.ok(false);
+      } catch(err) {
+        const errMsg = "Signer must be the update authority";
+        assert.equal((err as Error).toString(), errMsg);
+      }
+    })
+  });
 
   // TODO: test error is thrown when amount is changed
 
