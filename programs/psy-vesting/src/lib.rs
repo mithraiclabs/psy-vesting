@@ -6,14 +6,21 @@ declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 #[program]
 pub mod psy_vesting {
     use super::*;
-    pub fn create_vesting_contract(_ctx: Context<CreateVestingContract>) -> ProgramResult {
+    pub fn create_vesting_contract(ctx: Context<CreateVestingContract>, _vesting_item_length: u8) -> ProgramResult {
+        let vesting_contract = &mut ctx.accounts.vesting_contract;
+
+        vesting_contract.destination_address = *ctx.accounts.destination_address.key;
+        vesting_contract.mint_address = ctx.accounts.token_mint.key();
+        vesting_contract.token_vault = ctx.accounts.token_vault.key();
         Ok(())
     }
 }
 
 #[derive(Accounts)]
+#[instruction(vesting_item_length: u8)]
 pub struct CreateVestingContract<'info> {
-    pub signer: Signer<'info>,
+    #[account(mut)]
+    pub authority: Signer<'info>,
     /// The destination for the tokens when they are vested
     pub destination_address: AccountInfo<'info>,
     pub token_mint: Box<Account<'info, Mint>>,
@@ -21,19 +28,27 @@ pub struct CreateVestingContract<'info> {
         init,
         seeds = [&destination_address.key().to_bytes()[..], &token_mint.key().to_bytes()[..], b"vault"],
         bump,
-        payer = signer,    
+        payer = authority,    
         token::mint = token_mint,
         token::authority = vault_authority,
     )]
     pub token_vault: Box<Account<'info, TokenAccount>>,
     pub vault_authority: AccountInfo<'info>,
+    #[account(
+        init,
+        payer = authority,
+        space = 32 * 4 as usize + std::mem::size_of::<Vest>() * vesting_item_length as usize
+    )]
+    pub vesting_contract: Account<'info, VestingContract>,
 
     pub token_program: AccountInfo<'info>,
     pub rent: Sysvar<'info, Rent>,
     pub system_program: AccountInfo<'info>,
 }
 
-struct VestingContract {
+#[account]
+#[derive(Default)]
+pub struct VestingContract {
 	/// The destination for the tokens when they are vested
 	pub destination_address: Pubkey,
 	/// Optional authority that can extend the vesting date
@@ -46,11 +61,13 @@ struct VestingContract {
 	pub schedule: Vec<Vest>
 }
 
-struct Vest {
+// The size of the Vest is 8 + 8 + 1 = 17 bytes
+#[derive(Clone, AnchorSerialize, AnchorDeserialize)]
+pub struct Vest {
 	/// The amount that unlocks at the date
-	pub amount: u64,
+	pub amount: Pubkey,
 	/// The current unlock date
-	pub unlock_date: i64,
+	pub unlock_date: Pubkey,
 	/// Flag that the vesting has been claimed
 	pub claimed: bool,
 }

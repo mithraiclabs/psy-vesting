@@ -32,6 +32,7 @@ describe('psy-vesting createVestingContract', () => {
 
   describe("Given a valid SPL Token Mint and vesting information", () => {
     it("should create a valid VestingContract", async () => {
+      const vestingContractKeypair = new Keypair();
       // Test that the mint exists
       const mintInfo = await token.getMintInfo();
       assert.equal(mintInfo.supply.toString(), new u64(0).toString());
@@ -44,20 +45,28 @@ describe('psy-vesting createVestingContract', () => {
         payer.publicKey.toBuffer(), token.publicKey.toBuffer(), textEncoder.encode("vaultAuth")
       ], program.programId)
 
+      const vestingSchedule = [{
+        amount: 10,
+        unlock_date: new anchor.BN(new Date().getTime() / 1000 + 3), // 3 sec from now
+        claimed: false,
+      }]
+
       // make rpc call to create the VestingContract
       try {
-        await program.rpc.createVestingContract({
+        await program.rpc.createVestingContract(vestingSchedule.length, {
           accounts: {
-            signer: provider.wallet.publicKey,
+            authority: provider.wallet.publicKey,
             destinationAddress: payer.publicKey,
             tokenMint: token.publicKey,
             tokenVault: tokenVaultKey,
             vaultAuthority: vaultAuthorityKey,
+            vestingContract: vestingContractKeypair.publicKey,
 
             tokenProgram: TOKEN_PROGRAM_ID,
             systemProgram: SystemProgram.programId,
-            rent: SYSVAR_RENT_PUBKEY
-          }
+            rent: SYSVAR_RENT_PUBKEY,
+          },
+          signers: [vestingContractKeypair]
         })
       } catch(err) {
         console.error((err as Error).toString());
@@ -68,10 +77,14 @@ describe('psy-vesting createVestingContract', () => {
       const tokenVaultInfo = await token.getAccountInfo(tokenVaultKey);
       assert.ok(tokenVaultInfo.amount.eqn(0))
 
+      // test that the VestingContract account was created
+      const vestingContract = await program.account.vestingContract.fetch(vestingContractKeypair.publicKey);
+      assert.ok(true)
 
-      // TODO: test that the VestingContract account was created
-
-      // TODO: test that the new token account is stored on the VestingContract
+      assert.ok(vestingContract.destinationAddress.equals(payer.publicKey))
+      // test that the new token account is stored on the VestingContract
+      assert.ok(vestingContract.mintAddress.equals(token.publicKey))
+      assert.ok(vestingContract.tokenVault.equals(tokenVaultKey))
 
       // TODO: Test that the Vest array was stored properly
 
