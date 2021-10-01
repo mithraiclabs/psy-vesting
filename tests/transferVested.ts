@@ -58,14 +58,6 @@ describe("psy-vesting transferVested", () => {
       const destBefore = await token.getAccountInfo(signerTokenAccount)
       // make rpc call to transferVested
       try {
-        console.log({
-          destinationAddress: signerTokenAccount.toString(),
-          tokenVault: tokenVaultKey.toString(),
-          vestingContract: vestingContractKeypair.publicKey.toString(),
-          vaultAuthority: vaultAuthorityKey.toString(),
-          tokenMint: token.publicKey.toString(),
-          tokenProgram: TOKEN_PROGRAM_ID.toString()
-        })
         await program.rpc.transferVested(vaultAuthorityBump, {
           accounts: {
             destinationAddress: signerTokenAccount,
@@ -85,7 +77,9 @@ describe("psy-vesting transferVested", () => {
       const destAfter = await token.getAccountInfo(signerTokenAccount)
       const destDiff = destAfter.amount.sub(destBefore.amount)
       assert.ok(destDiff.eq(item1.amount))
-      // TODO: test that claimed is changed to true
+      // test that claimed is changed to true
+      const vestingContract = await program.account.vestingContract.fetch(vestingContractKeypair.publicKey);
+      assert.ok(vestingContract.schedule[0].claimed)
     })
   })
 

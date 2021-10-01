@@ -81,14 +81,16 @@ pub mod psy_vesting {
         let vesting_contract = &mut ctx.accounts.vesting_contract;
         let mut total_vested: u64 = 0;
         let clock = Clock::get()?;
-        let schedule = vesting_contract.schedule.clone();
-        for vest in schedule {
+        let mut schedule = vesting_contract.schedule.clone();
+        for (i, vest) in vesting_contract.schedule.iter().enumerate() {
             if clock.unix_timestamp > vest.unlock_date {
                 total_vested += vest.amount;
-                // TODO: while summing, update the claimed to true
-                // vest.claimed = true;
+                // while summing, update the claimed to true
+                schedule[i].claimed = true;
             }
         }
+
+        vesting_contract.schedule = schedule;
 
         // Transfer the total amount from the token vault to the destination address
         let cpi_accounts = Transfer {
@@ -167,6 +169,7 @@ pub struct TransferVested<'info> {
     pub destination_address: Account<'info, TokenAccount>,
     #[account(mut)]
     pub token_vault: Account<'info, TokenAccount>,
+    #[account(mut)]
     pub vesting_contract: Account<'info, VestingContract>,
     pub vault_authority: AccountInfo<'info>,
     pub token_mint: Account<'info, Mint>,
