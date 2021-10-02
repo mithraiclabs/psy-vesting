@@ -1,5 +1,14 @@
-import {AccountMeta, Connection, Keypair, PublicKey, sendAndConfirmTransaction, SystemProgram, SYSVAR_RENT_PUBKEY, Transaction} from "@solana/web3.js"
-import {MintLayout, Token, TOKEN_PROGRAM_ID} from "@solana/spl-token"
+import {
+  AccountMeta,
+  Connection,
+  Keypair,
+  PublicKey,
+  sendAndConfirmTransaction,
+  SystemProgram,
+  SYSVAR_RENT_PUBKEY,
+  Transaction,
+} from "@solana/web3.js";
+import { MintLayout, Token, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { BN, Program } from "@project-serum/anchor";
 
 const textEncoder = new TextEncoder();
@@ -7,8 +16,7 @@ const textEncoder = new TextEncoder();
 export type Vest = {
   amount: BN;
   unlockDate: BN;
-  claimed: boolean;
-}
+};
 
 export const createVestingContract = async (
   program: Program,
@@ -16,25 +24,32 @@ export const createVestingContract = async (
   destinationKey: PublicKey,
   tokenMint: PublicKey,
   vestingSchedule: Vest[],
-  updateAuthority: PublicKey|undefined = undefined,
+  updateAuthority: PublicKey | undefined = undefined
 ) => {
   const vestingContractKeypair = new Keypair();
-  
-  const [tokenVaultKey, tokenVaultBump] = await PublicKey.findProgramAddress([
-    destinationKey.toBuffer(), tokenMint.toBuffer(), textEncoder.encode("vault")
-  ], program.programId)
 
-  const [vaultAuthorityKey, vaultAuthorityBump] = await PublicKey.findProgramAddress([
-    tokenVaultKey.toBuffer(), textEncoder.encode("vaultAuth")
-  ], program.programId)
+  const [tokenVaultKey, tokenVaultBump] = await PublicKey.findProgramAddress(
+    [
+      destinationKey.toBuffer(),
+      tokenMint.toBuffer(),
+      textEncoder.encode("vault"),
+    ],
+    program.programId
+  );
+
+  const [vaultAuthorityKey, vaultAuthorityBump] =
+    await PublicKey.findProgramAddress(
+      [tokenVaultKey.toBuffer(), textEncoder.encode("vaultAuth")],
+      program.programId
+    );
 
   let remainingAccounts: AccountMeta[] = [];
   if (updateAuthority) {
     remainingAccounts.push({
       pubkey: updateAuthority,
       isSigner: false,
-      isWritable: false
-    })
+      isWritable: false,
+    });
   }
   await program.rpc.createVestingContract(vestingSchedule, {
     accounts: {
@@ -51,11 +66,15 @@ export const createVestingContract = async (
       rent: SYSVAR_RENT_PUBKEY,
     },
     remainingAccounts,
-    signers: [vestingContractKeypair]
-  })
-  return {tokenVaultKey, vestingContractKeypair, vaultAuthorityKey, vaultAuthorityBump}
-}
-
+    signers: [vestingContractKeypair],
+  });
+  return {
+    tokenVaultKey,
+    vestingContractKeypair,
+    vaultAuthorityKey,
+    vaultAuthorityBump,
+  };
+};
 
 export const initNewTokenMint = async (
   connection: Connection,

@@ -87,10 +87,10 @@ pub mod psy_vesting {
         let clock = Clock::get()?;
         let mut schedule = vesting_contract.schedule.clone();
         for (i, vest) in vesting_contract.schedule.iter().enumerate() {
-            if !vest.claimed && clock.unix_timestamp > vest.unlock_date {
+            if clock.unix_timestamp > vest.unlock_date {
                 total_vested += vest.amount;
-                // while summing, update the claimed to true
-                schedule[i].claimed = true;
+                // don't allow double claim
+                schedule[i].amount = 0;
             }
         }
 
@@ -168,7 +168,8 @@ pub struct CreateVestingContract<'info> {
         init,
         payer = authority,
         // The 8 is to account for anchors hash prefix
-        space = 8 + std::mem::size_of::<Pubkey>() * 5 as usize + std::mem::size_of::<Vest>() * vesting_schedule.len() as usize
+        // The 4 is for the u32 Vec::len
+        space = 8 + std::mem::size_of::<Pubkey>() * 5 as usize + 4 + std::mem::size_of::<Vest>() * vesting_schedule.len() as usize
     )]
     pub vesting_contract: Account<'info, VestingContract>,
 
@@ -239,7 +240,6 @@ pub struct CloseVestingContract<'info> {
     pub token_program: AccountInfo<'info>,
 }
 
-
 #[account]
 #[derive(Default)]
 pub struct VestingContract {
@@ -257,13 +257,11 @@ pub struct VestingContract {
 	pub schedule: Vec<Vest>
 }
 
-// The size of the Vest is 8 + 8 + 1 = 17 bytes
+// The size of the Vest is 8 + 8 = 16 bytes
 #[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct Vest {
 	/// The amount that unlocks at the date
 	pub amount: u64,
 	/// The current unlock date
 	pub unlock_date: i64,
-	/// Flag that the vesting has been claimed
-	pub claimed: bool,
 }
