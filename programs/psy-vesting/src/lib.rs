@@ -114,9 +114,11 @@ pub mod psy_vesting {
     }
 
     pub fn close_vesting_contract(ctx: Context<CloseVestingContract>) -> ProgramResult {
-        // TODO: Check that the token vault is the same as the VestingContract
-
-        // TODO: Check that the token vault is empty
+        // Check that the token vault is the same as the VestingContract
+        if ctx.accounts.vesting_contract.token_vault != ctx.accounts.token_vault.key() {
+            return Err(errors::ErrorCode::TokenVaultIsWrong.into())
+        }
+        // Check that the token vault is empty
         if ctx.accounts.token_vault.amount > 0 {
             return Err(errors::ErrorCode::TokenVaultNotEmpty.into())
         }

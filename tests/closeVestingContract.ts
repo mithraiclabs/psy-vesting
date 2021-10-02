@@ -120,7 +120,30 @@ describe("psy-vesting closeVestingContract", () => {
     })
   })
 
-  // TODO: Test error with spoofed token vault
+  // Test error with spoofed token vault
+  describe("Token vault account is spoofed", () => {
+    let fakeTokenVault: PublicKey;
+    before( async () => {
+      fakeTokenVault = await token.createAccount(payer.publicKey);
+    })
+    it("should error", async () => {
+      const vestingContract = await program.account.vestingContract.fetch(vestingContractKeypair.publicKey);
+      // make call to close VestingContract
+      try {
+        await program.rpc.closeVestingContract({
+          accounts: {
+            issuer: vestingContract.issuerAddress,
+            vestingContract: vestingContractKeypair.publicKey,
+            tokenVault: fakeTokenVault
+          }
+        })
+        assert.ok(false);
+      } catch(err) {
+        const errMsg = "The token vault must match the VestingContract";
+        assert.equal((err as Error).toString(), errMsg);
+      }
+    })
+  })
 
   // TODO: Test if all the vesting has been claimed (This is redundant..not gonna do it lol)
 })

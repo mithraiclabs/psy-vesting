@@ -14,4 +14,6 @@ pub enum ErrorCode {
   DestinationMustMatchVestingContract,
   #[msg("The token vault must be empty")]
   TokenVaultNotEmpty,
+  #[msg("The token vault must match the VestingContract")]
+  TokenVaultIsWrong,
 }
