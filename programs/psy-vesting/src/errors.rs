@@ -12,4 +12,10 @@ pub enum ErrorCode {
   NewDateMustBeLaterThanCurrent,
   #[msg("Destination address must match VestingContract")]
   DestinationMustMatchVestingContract,
+  #[msg("The token vault must be empty")]
+  TokenVaultNotEmpty,
+  #[msg("The token vault must match the VestingContract")]
+  TokenVaultIsWrong,
+  #[msg("Destination's mint address doesn't match the token")]
+  DestinationMintMismatch,
 }

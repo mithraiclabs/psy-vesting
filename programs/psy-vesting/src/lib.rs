@@ -1,16 +1,19 @@
 pub mod errors;
 
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, Mint, TokenAccount, Transfer};
+use anchor_spl::token::{self, Mint, TokenAccount, Transfer, CloseAccount};
 
 declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 
 #[program]
 pub mod psy_vesting {
     use super::*;
+
+    #[access_control(CreateVestingContract::accounts(&ctx))]
     pub fn create_vesting_contract(ctx: Context<CreateVestingContract>, vesting_schedule: Vec<Vest>) -> ProgramResult {
         let vesting_contract = &mut ctx.accounts.vesting_contract;
-        vesting_contract.destination_address = *ctx.accounts.destination_address.key;
+        vesting_contract.issuer_address = *ctx.accounts.authority.key;
+        vesting_contract.destination_address = ctx.accounts.destination_address.key();
         vesting_contract.mint_address = ctx.accounts.token_mint.key();
         vesting_contract.token_vault = ctx.accounts.token_vault.key();
         // sort the vesting schedule keys
@@ -111,6 +114,34 @@ pub mod psy_vesting {
         token::transfer(cpi_ctx, total_vested)?;
         Ok(())
     }
+
+    pub fn close_vesting_contract(ctx: Context<CloseVestingContract>, vault_authority_bump: u8) -> ProgramResult {
+        // Check that the token vault is the same as the VestingContract
+        if ctx.accounts.vesting_contract.token_vault != ctx.accounts.token_vault.key() {
+            return Err(errors::ErrorCode::TokenVaultIsWrong.into())
+        }
+        // Check that the token vault is empty
+        if ctx.accounts.token_vault.amount > 0 {
+            return Err(errors::ErrorCode::TokenVaultNotEmpty.into())
+        }
+        // Close the token vault
+        let cpi_accounts = CloseAccount {
+            account: ctx.accounts.token_vault.to_account_info(),
+            destination: ctx.accounts.issuer.to_account_info(),
+            authority: ctx.accounts.vault_authority.to_account_info(),
+        };
+        let token_vault_key = ctx.accounts.token_vault.key();
+        let seeds = [
+            token_vault_key.as_ref(),
+            b"vaultAuth",
+            &[vault_authority_bump]
+        ];
+        let signers = &[&seeds[..]];
+        let cpi_token_program = ctx.accounts.token_program.clone();
+        let cpi_ctx = CpiContext::new_with_signer(cpi_token_program, cpi_accounts, signers);
+        token::close_account(cpi_ctx)?;
+        Ok(())
+    }
 }
 
 #[derive(Accounts)]
@@ -121,7 +152,7 @@ pub struct CreateVestingContract<'info> {
     #[account(mut)]
     pub token_src: AccountInfo<'info>,
     /// The destination for the tokens when they are vested
-    pub destination_address: AccountInfo<'info>,
+    pub destination_address: Account<'info, TokenAccount>,
     pub token_mint: Box<Account<'info, Mint>>,
     #[account(
         init,
@@ -137,13 +168,22 @@ pub struct CreateVestingContract<'info> {
         init,
         payer = authority,
         // The 8 is to account for anchors hash prefix
-        space = 8 + std::mem::size_of::<Pubkey>() * 4 as usize + std::mem::size_of::<Vest>() * vesting_schedule.len() as usize
+        space = 8 + std::mem::size_of::<Pubkey>() * 5 as usize + std::mem::size_of::<Vest>() * vesting_schedule.len() as usize
     )]
     pub vesting_contract: Account<'info, VestingContract>,
 
     pub token_program: AccountInfo<'info>,
     pub rent: Sysvar<'info, Rent>,
     pub system_program: AccountInfo<'info>,
+}
+impl<'info> CreateVestingContract<'info> {
+    pub fn accounts(ctx: &Context<CreateVestingContract>) -> ProgramResult {
+        // Check the mint on the destination token account is the same as the token mint
+        if ctx.accounts.destination_address.mint != ctx.accounts.token_mint.key() {
+            return Err(errors::ErrorCode::DestinationMintMismatch.into())
+        }
+        Ok(())
+    }
 }
 
 #[derive(Accounts)]
@@ -187,10 +227,24 @@ impl<'info> TransferVested<'info> {
     }
 }
 
+#[derive(Accounts)]
+pub struct CloseVestingContract<'info> {
+    #[account(mut)]
+    pub issuer: AccountInfo<'info>,
+    #[account(mut, close = issuer)]
+    pub vesting_contract: Account<'info, VestingContract>,
+    #[account(mut)]
+    pub token_vault: Account<'info, TokenAccount>,
+    pub vault_authority: AccountInfo<'info>,
+    pub token_program: AccountInfo<'info>,
+}
+
 
 #[account]
 #[derive(Default)]
 pub struct VestingContract {
+    /// The SOL address that paid for the rent and should get it back
+    pub issuer_address: Pubkey,
 	/// The destination for the tokens when they are vested
 	pub destination_address: Pubkey,
 	/// Optional authority that can extend the vesting date

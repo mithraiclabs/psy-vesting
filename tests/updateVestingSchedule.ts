@@ -13,7 +13,7 @@ describe("psy-vesting updateVestingSchedule", () => {
   const payer = anchor.web3.Keypair.generate();
 
   let tokenKeypair: Keypair, token: Token, signerTokenAccount: PublicKey, tokenMintInfo: MintInfo;
-  let tokenVaultKey: PublicKey, vestingContractKeypair: Keypair;
+  let tokenVaultKey: PublicKey, vestingContractKeypair: Keypair, vaultAuthorityKey: PublicKey, vaultAuthorityBump: number, destinationAddress: PublicKey;
   const item1 = {
     amount: new anchor.BN(1),
     unlockDate: new anchor.BN(new Date().getTime() / 1000 + 400), // 400 sec from now
@@ -25,7 +25,7 @@ describe("psy-vesting updateVestingSchedule", () => {
     claimed: false,
   }
   let vestingSchedule: Vest[] = [item1, item2]
-  before(async () => {
+  beforeEach(async () => {
     // Send lamports to payer wallet
     await provider.connection.confirmTransaction(
       await provider.connection.requestAirdrop(
@@ -43,8 +43,16 @@ describe("psy-vesting updateVestingSchedule", () => {
    const amount = new anchor.BN(10_000_000).mul(new anchor.BN(10).pow(new anchor.BN(tokenMintInfo.decimals)));
    // mint 10,000,000 of tokens to the 
    await token.mintTo(signerTokenAccount, payer.publicKey, [], amount.toNumber());
+   destinationAddress = await token.createAssociatedTokenAccount(payer.publicKey);
    // create vesting schedule with update authority
-   ({tokenVaultKey, vestingContractKeypair} = await createVestingContract(program, signerTokenAccount, payer.publicKey, token.publicKey, vestingSchedule, payer.publicKey));
+   ({tokenVaultKey, vestingContractKeypair, vaultAuthorityKey, vaultAuthorityBump} = await createVestingContract(
+     program,
+     signerTokenAccount,
+     destinationAddress,
+     token.publicKey,
+     vestingSchedule,
+     payer.publicKey
+    ));
   })
   const newItem1 = {
     amount: new anchor.BN(1),
@@ -164,6 +172,8 @@ describe("psy-vesting updateVestingSchedule", () => {
     })
   })
 
-  // TODO: test case when trying to change Vest where claimed is true
+  // ~~test case when trying to change Vest where claimed is true~~
+  //  This actually cannot happen because the unlock date would have to have been in the past
+  //  and the instruction checks that the date of the vest has not passed
 
 })
