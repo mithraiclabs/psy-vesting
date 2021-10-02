@@ -14,8 +14,19 @@ describe('psy-vesting createVestingContract', () => {
   const provider = program.provider;
   const payer = anchor.web3.Keypair.generate();
 
-  let tokenKeypair: Keypair, token: Token, signerTokenAccount: PublicKey, tokenMintInfo: MintInfo;
-  before(async () => {
+  let tokenKeypair: Keypair, token: Token, signerTokenAccount: PublicKey, tokenMintInfo: MintInfo,
+  destinationAddress: PublicKey;
+  const item1 = {
+    amount: new anchor.BN(1),
+    unlockDate: new anchor.BN(new Date().getTime() / 1000 + 3), // 3 sec from now
+    claimed: false,
+  }
+  const item2 = {
+    amount: new anchor.BN(2),
+    unlockDate: new anchor.BN(new Date().getTime() / 1000 + 300), // 3 sec from now
+    claimed: false,
+  }
+  beforeEach(async () => {
     // Send lamports to payer wallet
     await provider.connection.confirmTransaction(
       await provider.connection.requestAirdrop(
@@ -33,6 +44,7 @@ describe('psy-vesting createVestingContract', () => {
    const amount = new anchor.BN(10_000_000).mul(new anchor.BN(10).pow(new anchor.BN(tokenMintInfo.decimals)));
    // mint 10,000,000 of tokens to the 
    await token.mintTo(signerTokenAccount, payer.publicKey, [], amount.toNumber());
+   destinationAddress = await token.createAssociatedTokenAccount(payer.publicKey);
   })
 
   describe("Given a valid SPL Token Mint and vesting information", () => {
@@ -49,7 +61,14 @@ describe('psy-vesting createVestingContract', () => {
 
       // make rpc call to create the VestingContract
       try {
-        ({tokenVaultKey, vestingContractKeypair} = await createVestingContract(program, signerTokenAccount, payer.publicKey, token.publicKey, vestingSchedule, payer.publicKey));
+        ({tokenVaultKey, vestingContractKeypair} = await createVestingContract(
+          program, 
+          signerTokenAccount, 
+          destinationAddress, 
+          token.publicKey, 
+          vestingSchedule, 
+          payer.publicKey
+        ));
       } catch(err) {
         console.error((err as Error).toString());
         throw err;
@@ -59,7 +78,7 @@ describe('psy-vesting createVestingContract', () => {
       const vestingContract = await program.account.vestingContract.fetch(vestingContractKeypair.publicKey);
       assert.ok(true)
 
-      assert.ok(vestingContract.destinationAddress.equals(payer.publicKey))
+      assert.ok(vestingContract.destinationAddress.equals(destinationAddress))
       // test that the new token account is stored on the VestingContract
       assert.ok(vestingContract.mintAddress.equals(token.publicKey))
       assert.ok(vestingContract.tokenVault.equals(tokenVaultKey))
@@ -77,9 +96,14 @@ describe('psy-vesting createVestingContract', () => {
 
     describe("no update authority", () => {
       it("should not store the update authority", async () => {
-        const destination = anchor.web3.Keypair.generate();
         try {
-          ({tokenVaultKey, vestingContractKeypair} = await createVestingContract(program, signerTokenAccount, destination.publicKey, token.publicKey, vestingSchedule));
+          ({tokenVaultKey, vestingContractKeypair} = await createVestingContract(
+            program,
+            signerTokenAccount,
+            destinationAddress,
+            token.publicKey,
+            vestingSchedule
+          ));
         } catch(err) {
           console.error((err as Error).toString());
           throw err;
@@ -90,19 +114,8 @@ describe('psy-vesting createVestingContract', () => {
     })
     describe("Vesting schedule is out of order", () => {
       it("should order the schedule", async () => {
-        const destination = anchor.web3.Keypair.generate();
-        const item1 = {
-          amount: new anchor.BN(1),
-          unlockDate: new anchor.BN(new Date().getTime() / 1000 + 3), // 3 sec from now
-          claimed: false,
-        }
-        const item2 = {
-          amount: new anchor.BN(2),
-          unlockDate: new anchor.BN(new Date().getTime() / 1000 + 300), // 3 sec from now
-          claimed: false,
-        }
         try {
-          ({tokenVaultKey, vestingContractKeypair} = await createVestingContract(program, signerTokenAccount, destination.publicKey, token.publicKey, [item2, item1]));
+          ({tokenVaultKey, vestingContractKeypair} = await createVestingContract(program, signerTokenAccount, destinationAddress, token.publicKey, [item2, item1]));
         } catch(err) {
           console.error((err as Error).toString());
           throw err;
@@ -114,5 +127,28 @@ describe('psy-vesting createVestingContract', () => {
     })
   })
 
-  // TODO: Very nice to have - Test that a destination address with a different mint errors
+  // Very nice to have - Test that a destination address with a different mint errors
+  describe("Destination's mint address does not match token mint", () => {
+    let badeDestAddr: PublicKey;
+    beforeEach(async () => {
+      const { mintAccount } = await initNewTokenMint(provider.connection, payer.publicKey, payer);
+      const newToken = new Token(provider.connection, mintAccount.publicKey, TOKEN_PROGRAM_ID, payer);
+      badeDestAddr = await newToken.createAssociatedTokenAccount(payer.publicKey);
+    })
+    it("should error", async () => {
+      try {
+        await createVestingContract(
+          program,
+          signerTokenAccount,
+          badeDestAddr,
+          token.publicKey,
+          [item2, item1]
+        );
+        assert.ok(false);
+      } catch(err) {
+        const errMsg = "Destination's mint address doesn't match the token";
+        assert.equal((err as Error).toString(), errMsg);
+      }
+    })
+  })
 });

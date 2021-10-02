@@ -8,10 +8,12 @@ declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 #[program]
 pub mod psy_vesting {
     use super::*;
+
+    #[access_control(CreateVestingContract::accounts(&ctx))]
     pub fn create_vesting_contract(ctx: Context<CreateVestingContract>, vesting_schedule: Vec<Vest>) -> ProgramResult {
         let vesting_contract = &mut ctx.accounts.vesting_contract;
         vesting_contract.issuer_address = *ctx.accounts.authority.key;
-        vesting_contract.destination_address = *ctx.accounts.destination_address.key;
+        vesting_contract.destination_address = ctx.accounts.destination_address.key();
         vesting_contract.mint_address = ctx.accounts.token_mint.key();
         vesting_contract.token_vault = ctx.accounts.token_vault.key();
         // sort the vesting schedule keys
@@ -150,7 +152,7 @@ pub struct CreateVestingContract<'info> {
     #[account(mut)]
     pub token_src: AccountInfo<'info>,
     /// The destination for the tokens when they are vested
-    pub destination_address: AccountInfo<'info>,
+    pub destination_address: Account<'info, TokenAccount>,
     pub token_mint: Box<Account<'info, Mint>>,
     #[account(
         init,
@@ -173,6 +175,15 @@ pub struct CreateVestingContract<'info> {
     pub token_program: AccountInfo<'info>,
     pub rent: Sysvar<'info, Rent>,
     pub system_program: AccountInfo<'info>,
+}
+impl<'info> CreateVestingContract<'info> {
+    pub fn accounts(ctx: &Context<CreateVestingContract>) -> ProgramResult {
+        // Check the mint on the destination token account is the same as the token mint
+        if ctx.accounts.destination_address.mint != ctx.accounts.token_mint.key() {
+            return Err(errors::ErrorCode::DestinationMintMismatch.into())
+        }
+        Ok(())
+    }
 }
 
 #[derive(Accounts)]

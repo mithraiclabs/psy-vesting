@@ -16,4 +16,6 @@ pub enum ErrorCode {
   TokenVaultNotEmpty,
   #[msg("The token vault must match the VestingContract")]
   TokenVaultIsWrong,
+  #[msg("Destination's mint address doesn't match the token")]
+  DestinationMintMismatch,
 }
