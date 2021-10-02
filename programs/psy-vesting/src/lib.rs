@@ -1,7 +1,7 @@
 pub mod errors;
 
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, Mint, TokenAccount, Transfer};
+use anchor_spl::token::{self, Mint, TokenAccount, Transfer, CloseAccount};
 
 declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 
@@ -113,7 +113,7 @@ pub mod psy_vesting {
         Ok(())
     }
 
-    pub fn close_vesting_contract(ctx: Context<CloseVestingContract>) -> ProgramResult {
+    pub fn close_vesting_contract(ctx: Context<CloseVestingContract>, vault_authority_bump: u8) -> ProgramResult {
         // Check that the token vault is the same as the VestingContract
         if ctx.accounts.vesting_contract.token_vault != ctx.accounts.token_vault.key() {
             return Err(errors::ErrorCode::TokenVaultIsWrong.into())
@@ -122,6 +122,22 @@ pub mod psy_vesting {
         if ctx.accounts.token_vault.amount > 0 {
             return Err(errors::ErrorCode::TokenVaultNotEmpty.into())
         }
+        // Close the token vault
+        let cpi_accounts = CloseAccount {
+            account: ctx.accounts.token_vault.to_account_info(),
+            destination: ctx.accounts.issuer.to_account_info(),
+            authority: ctx.accounts.vault_authority.to_account_info(),
+        };
+        let token_vault_key = ctx.accounts.token_vault.key();
+        let seeds = [
+            token_vault_key.as_ref(),
+            b"vaultAuth",
+            &[vault_authority_bump]
+        ];
+        let signers = &[&seeds[..]];
+        let cpi_token_program = ctx.accounts.token_program.clone();
+        let cpi_ctx = CpiContext::new_with_signer(cpi_token_program, cpi_accounts, signers);
+        token::close_account(cpi_ctx)?;
         Ok(())
     }
 }
@@ -206,7 +222,10 @@ pub struct CloseVestingContract<'info> {
     pub issuer: AccountInfo<'info>,
     #[account(mut, close = issuer)]
     pub vesting_contract: Account<'info, VestingContract>,
+    #[account(mut)]
     pub token_vault: Account<'info, TokenAccount>,
+    pub vault_authority: AccountInfo<'info>,
+    pub token_program: AccountInfo<'info>,
 }
 
 

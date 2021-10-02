@@ -114,5 +114,5 @@ describe('psy-vesting createVestingContract', () => {
     })
   })
 
-  // TODO: Test that a destination address with a different mint errors
+  // TODO: Very nice to have - Test that a destination address with a different mint errors
 });

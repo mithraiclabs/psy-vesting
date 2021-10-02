@@ -73,11 +73,13 @@ describe("psy-vesting closeVestingContract", () => {
       const vestingContract = await program.account.vestingContract.fetch(vestingContractKeypair.publicKey);
       // make call to close VestingContract
       try {
-        await program.rpc.closeVestingContract({
+        await program.rpc.closeVestingContract(vaultAuthorityBump, {
           accounts: {
             issuer: vestingContract.issuerAddress,
             vestingContract: vestingContractKeypair.publicKey,
-            tokenVault: vestingContract.tokenVault
+            tokenVault: vestingContract.tokenVault,
+            vaultAuthority: vaultAuthorityKey,
+            tokenProgram: TOKEN_PROGRAM_ID
           }
         })
       } catch(err) {
@@ -95,7 +97,9 @@ describe("psy-vesting closeVestingContract", () => {
       }
       expect(issuerAcctInfo.lamports).to.greaterThan(issuerAcctInfoBefore.lamports)
 
-      // TODO: test that the token vault gets closed
+      // test that the token vault gets closed
+      const tokenVault = await provider.connection.getAccountInfo(vestingContract.tokenVault);
+      assert.ok(!tokenVault);
     })
   })
 
@@ -105,11 +109,13 @@ describe("psy-vesting closeVestingContract", () => {
       const vestingContract = await program.account.vestingContract.fetch(vestingContractKeypair.publicKey);
       // make call to close VestingContract
       try {
-        await program.rpc.closeVestingContract({
+        await program.rpc.closeVestingContract(vaultAuthorityBump, {
           accounts: {
             issuer: vestingContract.issuerAddress,
             vestingContract: vestingContractKeypair.publicKey,
-            tokenVault: vestingContract.tokenVault
+            tokenVault: vestingContract.tokenVault,
+            vaultAuthority: vaultAuthorityKey,
+            tokenProgram: TOKEN_PROGRAM_ID
           }
         })
         assert.ok(false);
@@ -130,11 +136,13 @@ describe("psy-vesting closeVestingContract", () => {
       const vestingContract = await program.account.vestingContract.fetch(vestingContractKeypair.publicKey);
       // make call to close VestingContract
       try {
-        await program.rpc.closeVestingContract({
+        await program.rpc.closeVestingContract(vaultAuthorityBump, {
           accounts: {
             issuer: vestingContract.issuerAddress,
             vestingContract: vestingContractKeypair.publicKey,
-            tokenVault: fakeTokenVault
+            tokenVault: fakeTokenVault,
+            vaultAuthority: vaultAuthorityKey,
+            tokenProgram: TOKEN_PROGRAM_ID
           }
         })
         assert.ok(false);
