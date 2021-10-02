@@ -77,6 +77,7 @@ describe("psy-vesting closeVestingContract", () => {
           accounts: {
             issuer: vestingContract.issuerAddress,
             vestingContract: vestingContractKeypair.publicKey,
+            tokenVault: vestingContract.tokenVault
           }
         })
       } catch(err) {
@@ -93,9 +94,33 @@ describe("psy-vesting closeVestingContract", () => {
         throw new Error("Cannot load issuer account info");
       }
       expect(issuerAcctInfo.lamports).to.greaterThan(issuerAcctInfoBefore.lamports)
+
+      // TODO: test that the token vault gets closed
     })
   })
 
-  // TODO: Test if the token vault still has tokens in it
+  // Test if the token vault still has tokens in it
+  describe("The vault still has tokens in it", () => {
+    it("should error", async () => {
+      const vestingContract = await program.account.vestingContract.fetch(vestingContractKeypair.publicKey);
+      // make call to close VestingContract
+      try {
+        await program.rpc.closeVestingContract({
+          accounts: {
+            issuer: vestingContract.issuerAddress,
+            vestingContract: vestingContractKeypair.publicKey,
+            tokenVault: vestingContract.tokenVault
+          }
+        })
+        assert.ok(false);
+      } catch(err) {
+        const errMsg = "The token vault must be empty";
+        assert.equal((err as Error).toString(), errMsg);
+      }
+    })
+  })
+
+  // TODO: Test error with spoofed token vault
+
   // TODO: Test if all the vesting has been claimed (This is redundant..not gonna do it lol)
 })
