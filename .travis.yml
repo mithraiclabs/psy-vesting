@@ -22,5 +22,5 @@ jobs:
         - nvm install $NODE_VERSION
         - export NODE_PATH="/home/travis/.nvm/versions/node/v${NODE_VERSION}/lib/node_modules/:$NODE_PATH"
         - npm i -g @project-serum/anchor-cli
-        - npm install
+        - npm install --force
         - anchor test
