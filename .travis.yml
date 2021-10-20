@@ -1,0 +1,26 @@
+dist: bionic
+language: rust
+rust:
+  - nightly
+cache: cargo
+env:
+  global:
+    - NODE_VERSION="v16.11.0"
+    - SOLANA_CLI_VERSION="1.8.0"
+git:
+  submodules: true
+
+jobs:
+  include:
+      name: Runs the e2e tests
+      script:
+        - sudo apt-get install -y pkg-config build-essential libudev-dev
+        - rustup component add rustfmt clippy
+        - sh -c "$(curl -sSfL https://release.solana.com/v${SOLANA_CLI_VERSION}/install)"
+        - export PATH="/home/travis/.local/share/solana/install/active_release/bin:$PATH"
+        - yes | solana-keygen new
+        - nvm install $NODE_VERSION
+        - export NODE_PATH="/home/travis/.nvm/versions/node/v${NODE_VERSION}/lib/node_modules/:$NODE_PATH"
+        - npm i -g @project-serum/anchor-cli
+        - npm install --force
+        - anchor test
